@@ -7,7 +7,6 @@ import org.jetbrains.exposed.sql.Column
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.batchInsert
 import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.transactions.transaction
 
 
 object Recipes : IntIdTable() {
@@ -17,30 +16,36 @@ object Recipes : IntIdTable() {
     val imageId = reference("imageId", Images).nullable()
     val calories = integer("calories")
     val servings = integer("servings")
-    val duration: Column<Minutes> = integer("duration")
+    val cookingTime: Column<Minutes> = integer("cookingTime")
 
     fun initializeTable() {
         val titles = listOf("Steak with potatoes", "Spaghetti Bolognese", "Pizza margarita")
 
-        titles.forEachIndexed { index, title ->
+        titles.forEachIndexed { i, title ->
+            val index = i + 1
             Recipes.insert {
-                it[userId] = index + 1
+                it[userId] = index
                 it[Recipes.title] = title
                 it[description] = "Some description"
                 it[imageId] = null
                 it[calories] = 100
                 it[servings] = 2
-                it[duration] = 30
+                it[cookingTime] = 30
             }
 
             RecipeCategories.insert {
-                it[recipeId] = index + 1
-                it[categoryId] = index + 1
+                it[recipeId] = index
+                it[categoryId] = index
             }
 
             RecipeCategories.insert {
-                it[recipeId] = index + 1
-                it[categoryId] = ((index + 1) * 2) + 1
+                it[recipeId] = index
+                it[categoryId] = (index * 2) + 1
+            }
+
+            RecipeIngredients.batchInsert(1 * index..4 * index) {
+                this[RecipeIngredients.recipeId] = index
+                this[RecipeIngredients.ingredientId] = it
             }
         }
     }
@@ -61,6 +66,26 @@ object RecipeIngredients : Table() {
     override val primaryKey: PrimaryKey = PrimaryKey(recipeId, ingredientId)
 }
 
+object RecipeDirections : Table() {
+    val recipeId = reference("recipeId", Recipes)
+    val directionId = reference("directionId", Directions)
+
+    override val primaryKey: PrimaryKey = PrimaryKey(recipeId, directionId)
+}
+
+data class InsertRecipe(
+    val userId: UserId,
+    val title: String,
+    val description: String,
+    val image: ByteArray?,
+    val categories: List<CategoryId>,
+    val cookingTime: Minutes,
+    val calories: Int,
+    val servings: Int,
+    val ingredients: List<IngredientId>,
+    val directions: List<InsertDirection>
+)
+
 @Serializable
 data class Recipe(
     val id: RecipeId,
@@ -73,9 +98,9 @@ data class Recipe(
     val ratingsCount: Int,
     val calories: Int,
     val servings: Int,
-    val duration: Minutes,
+    val cookingTime: Minutes,
     val categories: List<Category>,
-//    val ingredients: List<Ingredient>,
+    val ingredients: List<Ingredient>,
 //    val directions: List<Direction>,
 //    val reviews: List<Review>
 )

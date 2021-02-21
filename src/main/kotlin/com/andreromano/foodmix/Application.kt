@@ -41,7 +41,9 @@ fun Application.module(testing: Boolean = false) {
             Users,
             Recipes,
             Ratings,
-            RecipeCategories
+            RecipeCategories,
+            RecipeIngredients,
+            RecipeDirections
         )
 
         Users.initializeTable()
