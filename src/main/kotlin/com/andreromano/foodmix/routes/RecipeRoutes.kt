@@ -7,14 +7,15 @@ import com.andreromano.foodmix.db.RecipeService
 import com.andreromano.foodmix.extensions.*
 import com.andreromano.foodmix.models.InsertDirection
 import com.andreromano.foodmix.models.InsertRecipe
+import com.andreromano.foodmix.models.RecipeOrderBy
 import io.ktor.application.*
 import io.ktor.http.*
 import io.ktor.http.content.*
 import io.ktor.request.*
 import io.ktor.response.*
 import io.ktor.routing.*
-import java.lang.Exception
 import java.util.*
+import kotlin.Exception
 
 fun Route.recipes(recipeService: RecipeService) {
     route("recipes") {
@@ -34,6 +35,21 @@ fun Route.recipes(recipeService: RecipeService) {
             val id: CategoryId = call.parameters["id"]?.toInt() ?: return@get call.respond(HttpStatusCode.BadRequest)
 
             call.respond(recipeService.getAllContainingCategory(id))
+        }
+
+        get("/ingredients") {
+            val ingredientIds: List<IngredientId> = call.parameters.getAll("ingredients")?.map {
+                it.toIntOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest, "ingredient should be a number")
+            } ?: return@get call.respond(HttpStatusCode.BadRequest, "ingredients are required")
+            val orderBy: RecipeOrderBy = call.parameters["order_by"]?.let {
+                try {
+                    RecipeOrderBy.valueOf(it)
+                } catch (ex: Exception) {
+                    null
+                }
+            } ?: return@get call.respond(HttpStatusCode.BadRequest, "error parsing order_by")
+
+            call.respond(recipeService.getAllContainingAllIngredients(ingredientIds, orderBy))
         }
 
         post {

@@ -47,6 +47,13 @@ object Recipes : IntIdTable() {
                 this[RecipeIngredients.recipeId] = index
                 this[RecipeIngredients.ingredientId] = it
             }
+
+            Directions.batchInsert(1..4) {
+                this[Directions.recipeId] = index
+                this[Directions.title] = "dir title $it"
+                this[Directions.description] = "dir description $it"
+                this[Directions.imageId] = null
+            }
         }
     }
 
@@ -64,13 +71,6 @@ object RecipeIngredients : Table() {
     val ingredientId = reference("ingredientId", Ingredients)
 
     override val primaryKey: PrimaryKey = PrimaryKey(recipeId, ingredientId)
-}
-
-object RecipeDirections : Table() {
-    val recipeId = reference("recipeId", Recipes)
-    val directionId = reference("directionId", Directions)
-
-    override val primaryKey: PrimaryKey = PrimaryKey(recipeId, directionId)
 }
 
 data class InsertRecipe(
@@ -101,6 +101,6 @@ data class Recipe(
     val cookingTime: Minutes,
     val categories: List<Category>,
     val ingredients: List<Ingredient>,
-//    val directions: List<Direction>,
+    val directions: List<Direction>,
 //    val reviews: List<Review>
 )

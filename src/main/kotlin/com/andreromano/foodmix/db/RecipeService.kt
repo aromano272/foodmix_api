@@ -40,7 +40,7 @@ class RecipeService {
                 this[RecipeIngredients.ingredientId] = ingredientId
             }
 
-            val directionIds = Directions.batchInsert(recipe.directions) { direction ->
+            Directions.batchInsert(recipe.directions) { direction ->
                 this[Directions.recipeId] = recipeId
                 this[Directions.title] = direction.title
                 this[Directions.description] = direction.description
@@ -54,11 +54,6 @@ class RecipeService {
                 this[Directions.imageId] = imageId
             }.map { it[Directions.id] }
 
-            RecipeDirections.batchInsert(directionIds) { directionId ->
-                this[RecipeDirections.recipeId] = recipeId
-                this[RecipeDirections.directionId] = directionId
-            }
-
             recipeId
         }
         return newSuspendedTransaction {
@@ -68,7 +63,8 @@ class RecipeService {
 
     suspend fun getAll(): List<Recipe> {
         val categoriesByRecipeId: Map<RecipeId, List<Category>> = getCategories()
-        val ingredientsByRecipeId: Map<IngredientId, List<Ingredient>> = getIngredients()
+        val ingredientsByRecipeId: Map<RecipeId, List<Ingredient>> = getIngredients()
+        val directionsByRecipeId: Map<RecipeId, List<Direction>> = getDirections()
 
         return newSuspendedTransaction {
             buildRecipesFieldSet()
@@ -77,6 +73,7 @@ class RecipeService {
                     it.toRecipe(
                         categoriesByRecipeId[it[Recipes.id].value].orEmpty(),
                         ingredientsByRecipeId[it[Recipes.id].value].orEmpty(),
+                        directionsByRecipeId[it[Recipes.id].value].orEmpty(),
                     )
                 }
         }
@@ -85,30 +82,55 @@ class RecipeService {
     suspend fun getByRecipe(id: RecipeId): Recipe? {
         val categories = getCategoriesByRecipe(id)
         val ingredients = getIngredientsByRecipe(id)
+        val directions = getDirectionsByRecipes(listOf(id))[id].orEmpty()
 
         return newSuspendedTransaction {
             buildRecipesFieldSet()
                 .select { Recipes.id eq id }
                 .singleOrNull()
-                ?.toRecipe(categories, ingredients)
+                ?.toRecipe(categories, ingredients, directions)
         }
     }
 
     suspend fun getAllContainingCategory(id: CategoryId): List<Recipe> {
         val categoriesByRecipeId: Map<RecipeId, List<Category>> = getCategoriesContainingCategory(id)
+        val ingredientsByRecipeId: Map<RecipeId, List<Ingredient>> = getIngredientsByRecipes(categoriesByRecipeId.keys.toList())
+        val directionsByRecipeId: Map<RecipeId, List<Direction>> = getDirectionsByRecipes(categoriesByRecipeId.keys.toList())
 
         // TODO: Maybe this all should be within a single transaction
         return newSuspendedTransaction {
-            val recipesQuery = buildRecipesFieldSet()
-                .selectAll()
+            buildRecipesFieldSet()
+                .select { Recipes.id inList categoriesByRecipeId.keys }
+                .map {
+                    it.toRecipe(
+                        categoriesByRecipeId[it[Recipes.id].value].orEmpty(),
+                        ingredientsByRecipeId[it[Recipes.id].value].orEmpty(),
+                        directionsByRecipeId[it[Recipes.id].value].orEmpty(),
+                    )
+                }
+        }
+    }
 
-            val recipesIds = recipesQuery.map { it[Recipes.id].value }
+    suspend fun getAllContainingAllIngredients(ids: List<IngredientId>, orderBy: RecipeOrderBy): List<Recipe> {
+        val ingredientsByRecipeId: Map<RecipeId, List<Ingredient>> = getIngredientsInRecipesContainingAllIngredients(ids)
+        val categoriesByRecipeId: Map<RecipeId, List<Category>> = getCategoriesByRecipes(ingredientsByRecipeId.keys.toList())
+        val directionsByRecipeId: Map<RecipeId, List<Direction>> = getDirectionsByRecipes(ingredientsByRecipeId.keys.toList())
 
-            val ingredients = getIngredientsByRecipes(recipesIds)
-            recipesQuery.map {
+        return newSuspendedTransaction {
+            val query = buildRecipesFieldSet()
+                .select { Recipes.id inList ingredientsByRecipeId.keys }
+
+            val orderedQuery = when (orderBy) {
+                RecipeOrderBy.RELEVANCE -> query.orderBy(Ratings.rating.count().alias("ratingCount"), SortOrder.DESC)
+                RecipeOrderBy.RATING -> query.orderBy(Ratings.rating.castTo<Float>(FloatColumnType()).avg(2).alias("ratingAvg"), SortOrder.DESC)
+                RecipeOrderBy.DURATION -> query.orderBy(Recipes.cookingTime)
+            }
+
+            orderedQuery.map {
                 it.toRecipe(
                     categoriesByRecipeId[it[Recipes.id].value].orEmpty(),
-                    ingredients[it[Recipes.id].value].orEmpty(),
+                    ingredientsByRecipeId[it[Recipes.id].value].orEmpty(),
+                    directionsByRecipeId[it[Recipes.id].value].orEmpty(),
                 )
             }
         }
@@ -119,6 +141,25 @@ class RecipeService {
             Ingredients
                 .innerJoin(RecipeIngredients)
                 .selectAll()
+                .map { it[RecipeIngredients.recipeId].value to it.toIngredient() }
+        }.fold(mapOf()) { acc, (recipeId, ingredient) ->
+            val newIngredients = (acc[recipeId] ?: emptyList()) + ingredient
+            acc + (recipeId to newIngredients)
+        }
+    }
+
+    private suspend fun getIngredientsInRecipesContainingAllIngredients(ids: List<IngredientId>): Map<RecipeId, List<Ingredient>> = withContext(Dispatchers.IO) {
+        newSuspendedTransaction {
+            val recipeIdsContainingAllIngredientsIds: List<IngredientId> = RecipeIngredients
+                .slice(RecipeIngredients.recipeId)
+                .select { RecipeIngredients.ingredientId inList ids }
+                .groupBy(RecipeIngredients.recipeId)
+                .having { RecipeIngredients.ingredientId.count() eq ids.size.toLong() }
+                .map { it[RecipeIngredients.recipeId].value }
+
+            Ingredients
+                .innerJoin(RecipeIngredients)
+                .select { RecipeIngredients.recipeId inList recipeIdsContainingAllIngredientsIds }
                 .map { it[RecipeIngredients.recipeId].value to it.toIngredient() }
         }.fold(mapOf()) { acc, (recipeId, ingredient) ->
             val newIngredients = (acc[recipeId] ?: emptyList()) + ingredient
@@ -164,6 +205,18 @@ class RecipeService {
             .map { it.toCategory() }
     }
 
+    private suspend fun getCategoriesByRecipes(ids: List<RecipeId>): Map<RecipeId, List<Category>> = withContext(Dispatchers.IO) {
+        newSuspendedTransaction {
+            Categories
+                .innerJoin(RecipeCategories)
+                .select { RecipeCategories.recipeId inList ids }
+                .map { it[RecipeCategories.recipeId].value to it.toCategory() }
+        }.fold(mapOf()) { acc, (recipeId, category) ->
+            val newCategories = (acc[recipeId] ?: emptyList()) + category
+            acc + (recipeId to newCategories)
+        }
+    }
+
     private suspend fun getCategoriesContainingCategory(id: CategoryId): Map<RecipeId, List<Category>> = withContext(Dispatchers.IO) {
         newSuspendedTransaction {
             val recipeIdsContainingCategory = RecipeCategories
@@ -177,6 +230,28 @@ class RecipeService {
         }.fold(mapOf()) { acc, (recipeId, category) ->
             val newCategories = (acc[recipeId] ?: emptyList()) + category
             acc + (recipeId to newCategories)
+        }
+    }
+
+    private suspend fun getDirections(): Map<RecipeId, List<Direction>> = withContext(Dispatchers.IO) {
+        newSuspendedTransaction {
+            Directions
+                .selectAll()
+                .map { it[Directions.recipeId].value to it.toDirection() }
+        }.fold(mapOf()) { acc, (recipeId, ingredient) ->
+            val newIngredients = (acc[recipeId] ?: emptyList()) + ingredient
+            acc + (recipeId to newIngredients)
+        }
+    }
+
+    private suspend fun getDirectionsByRecipes(ids: List<RecipeId>): Map<RecipeId, List<Direction>> = withContext(Dispatchers.IO) {
+        newSuspendedTransaction {
+            Directions
+                .select { Directions.recipeId inList ids }
+                .map { it[Directions.recipeId].value to it.toDirection() }
+        }.fold(mapOf()) { acc, (recipeId, ingredient) ->
+            val newIngredients = (acc[recipeId] ?: emptyList()) + ingredient
+            acc + (recipeId to newIngredients)
         }
     }
 
@@ -201,7 +276,8 @@ class RecipeService {
 
     private fun ResultRow.toRecipe(
         categories: List<Category>,
-        ingredients: List<Ingredient>
+        ingredients: List<Ingredient>,
+        directions: List<Direction>
     ): Recipe {
         val ratingAvg = Ratings.rating.castTo<Float>(FloatColumnType()).avg(2).alias("ratingAvg")
         val ratingCount = Ratings.rating.count().alias("ratingCount")
@@ -222,6 +298,7 @@ class RecipeService {
             cookingTime = this[Recipes.cookingTime],
             categories = categories,
             ingredients = ingredients,
+            directions = directions,
         )
     }
 
@@ -236,6 +313,13 @@ class RecipeService {
         name = this[Ingredients.name],
         imageUrl = this[Ingredients.imageId]?.value?.toImageUrl(),
         type = this[Ingredients.type],
+    )
+
+    private fun ResultRow.toDirection(): Direction = Direction(
+        id = this[Directions.id].value,
+        title = this[Directions.title],
+        description = this[Directions.description],
+        imageUrl = this[Directions.imageId]?.value?.toImageUrl(),
     )
 
 }

@@ -11,7 +11,7 @@ object Directions : IntIdTable() {
     val recipeId = reference("recipeId", Recipes)
 
     val title = varchar("title", 255)
-    val description = varchar("description", 255).nullable()
+    val description = varchar("description", 255)
     val imageId = reference("imageId", Images).nullable()
 }
 

@@ -17,5 +17,5 @@ inline class Image(val value: ByteArray)
 
 fun ImageId.toImageUrl(): ImageUrl {
     val hostAddress = NetworkInterface.getNetworkInterfaces().toList().first().inetAddresses.toList().first().hostAddress
-    return "https://$hostAddress/image/$this"
+    return "http://$hostAddress:8080/images/$this"
 }

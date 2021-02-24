@@ -4,13 +4,22 @@ import com.andreromano.foodmix.models.Ingredient
 import com.andreromano.foodmix.models.Ingredients
 import com.andreromano.foodmix.models.toImageUrl
 import org.jetbrains.exposed.sql.ResultRow
+import org.jetbrains.exposed.sql.lowerCase
+import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 
 class IngredientService {
 
-    suspend fun get(): List<Ingredient> = newSuspendedTransaction {
-        Ingredients.selectAll().map { it.toIngredient() }
+    suspend fun get(searchString: String? = null): List<Ingredient> = newSuspendedTransaction {
+        if (searchString.isNullOrEmpty())
+            Ingredients
+                .selectAll()
+                .map { it.toIngredient() }
+        else
+            Ingredients
+                .select { Ingredients.name.lowerCase() like searchString.toLowerCase() }
+                .map { it.toIngredient() }
     }
 
     private fun ResultRow.toIngredient(): Ingredient = Ingredient(
