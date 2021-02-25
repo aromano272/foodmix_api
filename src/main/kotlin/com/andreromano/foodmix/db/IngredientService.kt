@@ -1,5 +1,6 @@
 package com.andreromano.foodmix.db
 
+import com.andreromano.foodmix.IngredientType
 import com.andreromano.foodmix.models.Ingredient
 import com.andreromano.foodmix.models.Ingredients
 import com.andreromano.foodmix.models.toImageUrl
@@ -20,6 +21,14 @@ class IngredientService {
             Ingredients
                 .select { Ingredients.name.lowerCase() like searchString.toLowerCase() }
                 .map { it.toIngredient() }
+    }
+
+    suspend fun getTypes(): List<IngredientType> = newSuspendedTransaction {
+        Ingredients
+            .slice(Ingredients.type)
+            .selectAll()
+            .distinct()
+            .map { it[Ingredients.type] }
     }
 
     private fun ResultRow.toIngredient(): Ingredient = Ingredient(

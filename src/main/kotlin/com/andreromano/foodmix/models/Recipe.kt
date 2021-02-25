@@ -92,7 +92,7 @@ data class Recipe(
     val author: User,
     val title: String,
     val description: String,
-//    val isFavorite: Boolean,
+    val isFavorite: Boolean,
     val imageUrl: String?,
     val rating: Float,
     val ratingsCount: Int,
@@ -102,5 +102,5 @@ data class Recipe(
     val categories: List<Category>,
     val ingredients: List<Ingredient>,
     val directions: List<Direction>,
-//    val reviews: List<Review>
+    val reviews: List<Review>
 )

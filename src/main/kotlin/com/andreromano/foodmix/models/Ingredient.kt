@@ -9,7 +9,6 @@ import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.dao.id.IntIdTable
 import org.jetbrains.exposed.sql.Column
 import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.transactions.transaction
 
 object Ingredients : IntIdTable() {
 
@@ -18,7 +17,7 @@ object Ingredients : IntIdTable() {
     val type: Column<IngredientType> = varchar("type", 255)
 
     fun initializeTable() {
-        val json = javaClass.classLoader.getResource("ingredients.json")?.readText() ?: return
+        val json = javaClass.classLoader.getResource("database/ingredients.json")?.readText() ?: return
         val ingredientsMap: Map<String, List<JsonIngredient>> = Json.decodeFromString(json)
 
         ingredientsMap.forEach { (ingredientType, ingredients) ->

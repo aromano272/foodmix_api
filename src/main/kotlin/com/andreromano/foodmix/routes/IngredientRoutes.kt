@@ -12,6 +12,10 @@ fun Route.ingredients(ingredientService: IngredientService) {
             call.respond(ingredientService.get())
         }
 
+        get("/types") {
+            call.respond(ingredientService.getTypes())
+        }
+
         get("/{searchQuery}") {
             val searchQuery = call.parameters["searchQuery"] ?: return@get call.respond(HttpStatusCode.BadRequest)
 

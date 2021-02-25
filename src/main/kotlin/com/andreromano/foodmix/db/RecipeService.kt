@@ -290,6 +290,7 @@ class RecipeService {
             ),
             title = this[Recipes.title],
             description = this[Recipes.description],
+            isFavorite = true,
             imageUrl = this[Recipes.imageId]?.value?.toImageUrl(),
             rating = this.getOrNull(ratingAvg.aliasOnlyExpression())?.toFloat() ?: 0f,
             ratingsCount = this.getOrNull(ratingCount.aliasOnlyExpression())?.toInt() ?: 0,
@@ -299,6 +300,7 @@ class RecipeService {
             categories = categories,
             ingredients = ingredients,
             directions = directions,
+            reviews = emptyList()
         )
     }
 
