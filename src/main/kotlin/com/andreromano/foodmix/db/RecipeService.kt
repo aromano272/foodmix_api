@@ -286,7 +286,9 @@ class RecipeService {
             id = this[Recipes.id].value,
             author = User(
                 id = this[Users.id].value,
-                name = this[Users.name]
+                name = this[Users.name],
+                avatarUrl = this[Users.avatarImageId]?.value?.toImageUrl(),
+                backgroundUrl = this[Users.backgroundImageId]?.value?.toImageUrl(),
             ),
             title = this[Recipes.title],
             description = this[Recipes.description],
@@ -307,7 +309,7 @@ class RecipeService {
     private fun ResultRow.toCategory(): Category = Category(
         id = this[RecipeCategories.categoryId].value,
         name = this[Categories.name],
-        imageUrl = this[Categories.imageId]?.value?.toImageUrl(),
+        imageUrl = this[Categories.imageId].value.toImageUrl(),
     )
 
     private fun ResultRow.toIngredient(): Ingredient = Ingredient(

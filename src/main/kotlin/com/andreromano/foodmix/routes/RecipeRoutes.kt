@@ -20,7 +20,7 @@ import kotlin.Exception
 fun Route.recipes(recipeService: RecipeService) {
     route("recipes") {
 
-        get() {
+        get {
             call.respond(recipeService.getAll())
         }
 

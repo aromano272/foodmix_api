@@ -1,14 +1,8 @@
 package com.andreromano.foodmix
 
-import com.andreromano.foodmix.db.CategoryService
-import com.andreromano.foodmix.db.ImageService
-import com.andreromano.foodmix.db.IngredientService
-import com.andreromano.foodmix.db.RecipeService
+import com.andreromano.foodmix.db.*
 import com.andreromano.foodmix.models.*
-import com.andreromano.foodmix.routes.categories
-import com.andreromano.foodmix.routes.images
-import com.andreromano.foodmix.routes.ingredients
-import com.andreromano.foodmix.routes.recipes
+import com.andreromano.foodmix.routes.*
 import io.ktor.application.*
 import io.ktor.features.*
 import io.ktor.routing.*
@@ -30,6 +24,7 @@ fun Application.module(testing: Boolean = false) {
     val imageService = ImageService()
     val ingredientService = IngredientService()
     val recipeService = RecipeService()
+    val userProfileService = UserProfileService()
 
     Database.connect("jdbc:h2:mem:test;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
 
@@ -58,6 +53,7 @@ fun Application.module(testing: Boolean = false) {
         images(imageService)
         ingredients(ingredientService)
         recipes(recipeService)
+        userProfile(userProfileService)
     }
 
 }

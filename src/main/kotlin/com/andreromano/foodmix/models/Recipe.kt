@@ -28,9 +28,9 @@ object Recipes : IntIdTable() {
                 it[Recipes.title] = title
                 it[description] = "Some description"
                 it[imageId] = null
-                it[calories] = 100
-                it[servings] = 2
-                it[cookingTime] = 30
+                it[calories] = index * 100
+                it[servings] = index * 2
+                it[cookingTime] = index * 10
             }
 
             RecipeCategories.insert {
